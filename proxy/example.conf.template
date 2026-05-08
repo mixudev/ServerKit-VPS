@@ -1,0 +1,53 @@
+# ============================================================
+# CONTOH CONFIG — Salin dan sesuaikan untuk site baru
+# Simpan sebagai: /srv/proxy/conf.d/nama-site.conf
+# ============================================================
+#
+# Setelah menambah/mengubah file ini, reload nginx:
+#   docker exec nginx-proxy nginx -s reload
+#
+# ============================================================
+
+server {
+    listen 80;
+    server_name example.local;          # Ganti dengan domain/subdomain kamu
+
+    # ----- Proxy ke container app -----
+    location / {
+        proxy_pass         http://example-nginx:80;   # Ganti: nama-container:port
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+    }
+
+    # ----- Log -----
+    access_log /var/log/nginx/example.access.log;
+    error_log  /var/log/nginx/example.error.log;
+}
+
+# ============================================================
+# TEMPLATE UNTUK SITE YANG LANGSUNG EXPOSE PORT (tanpa nginx internal)
+# Contoh: FastAPI, Node.js, app lain yang tidak punya nginx sendiri
+# ============================================================
+#
+# server {
+#     listen 80;
+#     server_name api.example.local;
+#
+#     location / {
+#         proxy_pass         http://fastapi-app:8000;
+#         proxy_set_header   Host $host;
+#         proxy_set_header   X-Real-IP $remote_addr;
+#         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header   X-Forwarded-Proto $scheme;
+#         proxy_read_timeout 300;
+#     }
+# }
