@@ -1,0 +1,28 @@
+# =============================================
+# .gitignore — Docker Server Kit
+# =============================================
+
+# ----- Sertifikat SSL (JANGAN commit ke repo) -----
+proxy/certs/**/*.pem
+proxy/certs/live/
+proxy/certs/accounts/
+proxy/certs/archive/
+proxy/certs/renewal/
+proxy/certbot-www/
+
+# ----- Environment files -----
+**/.env
+*.env
+
+# ----- Log files -----
+*.log
+
+# ----- OS files -----
+.DS_Store
+Thumbs.db
+
+# ----- Editor -----
+.vscode/
+.idea/
+*.swp
+*.swo

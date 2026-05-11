@@ -27,17 +27,21 @@ log_error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 SITE_NAME="$1"
 DOMAIN="$2"
 PORT="${3:-8000}"
+SSL_MODE="${4:-}"
 SITE_DIR="/srv/sites/$SITE_NAME"
 PROXY_CONF="/srv/proxy/conf.d/${SITE_NAME}.conf"
 
 # ---- Validasi input ----
 if [ -z "$SITE_NAME" ] || [ -z "$DOMAIN" ]; then
     echo ""
-    echo "Usage: $0 <nama-site> <domain> [port]"
+    echo "Usage: $0 <nama-site> <domain> [port] [--ssl]"
     echo ""
     echo "Contoh:"
-    echo "  $0 toko-online  toko.local  8000"
-    echo "  $0 blog-saya    blog.local  3000"
+    echo "  $0 toko-online  toko.local        8000         # HTTP only"
+    echo "  $0 toko-online  toko.example.com  8000  --ssl  # HTTPS"
+    echo ""
+    echo "Flag --ssl: Generate Nginx config dengan HTTPS + redirect."
+    echo "  Jalankan ssl-local.sh atau ssl-production.sh untuk generate sertifikat."
     echo ""
     exit 1
 fi
@@ -58,6 +62,11 @@ echo "  🌐 Membuat site baru: $SITE_NAME"
 echo "================================================================"
 echo "  Domain  : $DOMAIN"
 echo "  Port    : $PORT"
+if [ "$SSL_MODE" = "--ssl" ]; then
+    echo "  Mode    : HTTPS (dengan redirect HTTP→HTTPS)"
+else
+    echo "  Mode    : HTTP only"
+fi
 echo "  Folder  : $SITE_DIR"
 echo ""
 
@@ -162,24 +171,49 @@ DOCKERFILE
 log_success "Dockerfile placeholder dibuat."
 
 # ---- Buat Nginx config di proxy ----
-cat > "$PROXY_CONF" << NGINX
+if [ "$SSL_MODE" = "--ssl" ]; then
+    # ---- Config HTTPS (dual block: redirect + SSL) ----
+    cat > "$PROXY_CONF" << NGINX
 # ============================================================
 # Nginx Proxy Config — ${SITE_NAME}
 # Domain: ${DOMAIN}
+# Mode  : HTTPS
 # ============================================================
 # Setelah mengubah file ini, reload nginx:
 #   docker exec nginx-proxy nginx -s reload
+#
+# Pastikan sertifikat sudah ada sebelum reload:
+#   /srv/ssl-local.sh ${DOMAIN}       # untuk local
+#   /srv/ssl-production.sh ${DOMAIN} email@example.com  # untuk production
 # ============================================================
 
+# Block 1: HTTP → redirect ke HTTPS
 server {
     listen 80;
     server_name ${DOMAIN};
 
-    # Jika app kamu punya Nginx sendiri (Laravel, dll):
-    # proxy_pass ke container nginx internalnya
-    #
-    # Jika app kamu langsung expose port (FastAPI, Node.js, dll):
-    # proxy_pass ke container app langsung
+    # ACME challenge untuk Let's Encrypt renewal
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+
+    access_log /var/log/nginx/${SITE_NAME}.access.log;
+    error_log  /var/log/nginx/${SITE_NAME}.error.log;
+}
+
+# Block 2: HTTPS
+server {
+    listen 443 ssl;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/nginx/certs/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/${DOMAIN}/privkey.pem;
+    include             /etc/nginx/conf.d/ssl-params.conf;
+
     location / {
         proxy_pass         http://${SITE_NAME}-app:${PORT};
         proxy_http_version 1.1;
@@ -194,10 +228,45 @@ server {
         proxy_connect_timeout 300;
     }
 
-    access_log /var/log/nginx/access.log;
-    error_log  /var/log/nginx/error.log;
+    access_log /var/log/nginx/${SITE_NAME}.access.log;
+    error_log  /var/log/nginx/${SITE_NAME}.error.log;
 }
 NGINX
+else
+    # ---- Config HTTP only ----
+    cat > "$PROXY_CONF" << NGINX
+# ============================================================
+# Nginx Proxy Config — ${SITE_NAME}
+# Domain: ${DOMAIN}
+# Mode  : HTTP only
+# ============================================================
+# Untuk aktifkan HTTPS, gunakan:
+#   /srv/new-site.sh ${SITE_NAME} ${DOMAIN} ${PORT} --ssl
+# ============================================================
+
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    location / {
+        proxy_pass         http://${SITE_NAME}-app:${PORT};
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+    }
+
+    access_log /var/log/nginx/${SITE_NAME}.access.log;
+    error_log  /var/log/nginx/${SITE_NAME}.error.log;
+}
+NGINX
+fi
 
 log_success "Nginx config dibuat di $PROXY_CONF"
 
@@ -235,9 +304,21 @@ echo ""
 echo "  4. Reload Nginx proxy (zero-downtime):"
 echo "     docker exec nginx-proxy nginx -s reload"
 echo ""
-echo "  5. Tambahkan ke /etc/hosts di komputer kamu:"
 SERVER_IP=$(hostname -I | awk '{print $1}')
-echo "     $SERVER_IP   $DOMAIN"
+if [ "$SSL_MODE" = "--ssl" ]; then
+    echo "  5. Generate sertifikat SSL:"
+    echo "     Local (mkcert) : /srv/ssl-local.sh $DOMAIN"
+    echo "     Production     : /srv/ssl-production.sh $DOMAIN admin@email.com"
+    echo ""
+    echo "  6. Akses site:"
+    echo "     https://$DOMAIN"
+else
+    echo "  5. Tambahkan ke /etc/hosts (jika domain lokal):"
+    echo "     $SERVER_IP   $DOMAIN"
+    echo ""
+    echo "  6. Akses site:"
+    echo "     http://$DOMAIN"
+fi
 echo ""
-echo "  📖 Lihat docs/adding-sites.md untuk template stack lengkap."
+echo "  📖 Lihat docs/ssl.md untuk panduan SSL lengkap."
 echo ""

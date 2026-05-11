@@ -7,26 +7,27 @@ Penjelasan lengkap desain dan keputusan arsitektur Docker Server Kit.
 ## Gambaran Besar
 
 ```
-┌─────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────┐
 │                    Ubuntu Server                     │
 │                                                     │
-│  Port 80 ──► ┌─────────────────┐                   │
-│  Port 443 ──►│   nginx-proxy   │  (global)          │
-│              └────────┬────────┘                    │
-│                       │ routing by domain            │
-│              proxy-network (Docker bridge)           │
-│            ┌──────────┴──────────┐                  │
-│            │                     │                  │
-│   ┌────────▼────────┐   ┌────────▼────────┐        │
-│   │   site-a nginx  │   │   site-b nginx  │        │
-│   │   (internal)    │   │   (internal)    │        │
-│   └────────┬────────┘   └────────┬────────┘        │
-│            │ internal-a           │ internal-b       │
-│   ┌────────▼────────┐   ┌────────▼────────┐        │
-│   │  app  db  redis │   │  app  db  redis │        │
-│   │  (terisolasi)   │   │  (terisolasi)   │        │
-│   └─────────────────┘   └─────────────────┘        │
-└─────────────────────────────────────────────────────┘
+│  Port 80  ──► ┌─────────────────┐  SSL Termination     │
+│  Port 443 ──►│   nginx-proxy    │  (HTTPS → HTTP)      │
+│           │  /etc/nginx/certs│                       │
+│           └────────┬────────┘                       │
+│                    │ routing by domain                │
+│           proxy-network (Docker bridge)               │
+│         ┌──────────┴───────────┐                    │
+│         │                      │                    │
+│ ┌───────────▼───────┐   ┌───────────▼───────┐        │
+│ │   site-a nginx  │   │   site-b nginx  │        │
+│ │   (internal)    │   │   (internal)    │        │
+│ └────────┬────────┘   └────────┬────────┘        │
+│           │ internal-a           │ internal-b       │
+│ ┌───────────▼───────┐   ┌───────────▼───────┐        │
+│ │  app  db  redis │   │  app  db  redis │        │
+│ │  (terisolasi)   │   │  (terisolasi)   │        │
+│ └───────────────────┘   └───────────────────┘        │
+└───────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -118,22 +119,27 @@ proxy_pass http://mixuauth-nginx:80;
 
 ---
 
-## Flow Request (Laravel)
+## Flow Request (Laravel + HTTPS)
 
 ```
-1. Browser      → GET http://mixuauth.local
-2. /etc/hosts   → resolve ke 192.168.1.100 (IP server)
-3. nginx-proxy  → terima di port 80
+1. Browser      → GET https://mixuauth.local
+2. DNS/hosts    → resolve ke 192.168.1.100 (IP server)
+3. nginx-proxy  → terima di port 443
+                   TLS handshake (sertifikat dari /etc/nginx/certs/)
                    server_name mixuauth.local → match
-                   proxy_pass http://mixuauth-nginx:80
+                   proxy_pass http://mixuauth-nginx:80  (HTTP internal)
 4. mixuauth-nginx (internal)
                 → try_files → /index.php
                 → fastcgi_pass app:9000
 5. mixuauth-app (PHP-FPM)
                 → proses request Laravel
                 → return response
-6. Response balik ke browser
+6. Response balik ke browser via HTTPS
 ```
+
+> **SSL Termination di Proxy:** Traffic antara nginx-proxy dan nginx-internal berjalan
+> via HTTP di jaringan Docker internal (proxy-network). Ini aman karena Docker network
+> tidak bisa diakses dari luar server. Hanya koneksi dari browser ke proxy yang HTTPS.
 
 ---
 

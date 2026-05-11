@@ -1,0 +1,15 @@
+# Direktori ini untuk menyimpan sertifikat SSL.
+# File sertifikat (.pem) di-gitignore — JANGAN commit ke Git!
+#
+# Struktur:
+#   certs/
+#   ├── example.com/
+#   │   ├── fullchain.pem   ← sertifikat (generated oleh mkcert / certbot)
+#   │   └── privkey.pem     ← private key
+#   └── auth.example.com/
+#       ├── fullchain.pem
+#       └── privkey.pem
+#
+# Generate sertifikat:
+#   Local (mkcert)      : scripts/ssl-local.sh <domain>
+#   Production (certbot): scripts/ssl-production.sh <domain> <email>

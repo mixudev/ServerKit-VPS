@@ -11,8 +11,9 @@ Production-ready Docker server infrastructure untuk hosting **multiple websites*
 -  **Per-folder per-site** — setiap website punya folder dan lifecycle sendiri
 -  **Network isolation** — database dan service internal tidak bisa diakses dari luar
 -  **Zero-downtime reload** — tambah/ubah site tanpa restart proxy
-- 🛠️ **Script helper** — scaffold site baru dengan satu perintah
--  **Dokumentasi lengkap** — panduan CLI, troubleshooting, dan best practice
+-  **HTTPS / SSL** — mkcert (local) + Let's Encrypt (production), auto-renewal
+- 🛠️ **Script helper** — scaffold site baru, SSL setup, semua satu perintah
+-  **Dokumentasi lengkap** — panduan CLI, SSL, troubleshooting, dan best practice
 
 ---
 
@@ -122,10 +123,11 @@ docker-server-kit/
 
 | Dokumen | Deskripsi |
 |---------|-----------|
-| [Instalasi Lengkap](docs/installation.md) | Step-by-step setup dari nol |
+| [Instalasi Lengkap](docs/Instalation.md) | Step-by-step setup dari nol |
+| [SSL / HTTPS](docs/ssl.md) | Setup HTTPS: local mkcert + production Let's Encrypt |
 | [CLI Reference](docs/cli-reference.md) | Semua perintah yang perlu diketahui |
-| [Menambah Site](docs/adding-sites.md) | Template untuk Laravel, FastAPI, Node.js, dll |
-| [Troubleshooting](docs/troubleshooting.md) | Solusi masalah umum |
+| [Menambah Site](docs/add-site.md) | Template untuk Laravel, FastAPI, Node.js, dll |
+| [Troubleshooting](docs/troubleshoting.md) | Solusi masalah umum |
 | [Arsitektur](docs/architecture.md) | Penjelasan desain sistem |
 
 ---
@@ -136,8 +138,17 @@ docker-server-kit/
 # Jalankan proxy
 cd /srv/proxy && docker compose up -d
 
-# Tambah site baru
-./scripts/new-site.sh nama-site domain.local 8000
+# Tambah site baru (HTTP)
+/srv/new-site.sh nama-site domain.local 8000
+
+# Tambah site baru (HTTPS)
+/srv/new-site.sh nama-site domain.com 8000 --ssl
+
+# Setup SSL — local (mkcert)
+/srv/ssl-local.sh domain.local
+
+# Setup SSL — production (Let's Encrypt)
+/srv/ssl-production.sh domain.com admin@email.com
 
 # Reload nginx setelah tambah/edit config (zero-downtime)
 docker exec nginx-proxy nginx -s reload
@@ -165,17 +176,19 @@ docker exec -it nama-container sh
 ```
 Browser
    │
-   ▼ port 80/443
-┌──────────────────┐
-│   nginx-proxy    │  ← satu-satunya yang expose port publik
-└────────┬─────────┘
-         │ routing by domain
-    ┌────┴────┐
-    ▼         ▼
-┌────────┐ ┌────────┐
-│ site-a │ │ site-b │  ← masing-masing terisolasi
-│ nginx  │ │ nginx  │     bisa up/down independent
-└────────┘ └────────┘
+   ▼ port 80  (HTTP → redirect ke HTTPS)
+   ▼ port 443 (HTTPS — SSL terminated di proxy)
+┌──────────────────────────────┐
+│        nginx-proxy           │  ← satu-satunya yang expose port publik
+│  /etc/nginx/certs/ (SSL)     │
+└────────────┬─────────────────┘
+             │ routing by domain
+        ┌────┴────┐
+        ▼         ▼
+   ┌────────┐ ┌────────┐
+   │ site-a │ │ site-b │  ← masing-masing terisolasi
+   │ nginx  │ │ nginx  │     bisa up/down independent
+   └────────┘ └────────┘
 ```
 
 Setiap site terhubung ke dua network:

@@ -1,20 +1,61 @@
 # ============================================================
-# CONTOH CONFIG — Salin dan sesuaikan untuk site baru
+# TEMPLATE SITE CONFIG — Salin dan sesuaikan untuk site baru
+#
 # Simpan sebagai: /srv/proxy/conf.d/nama-site.conf
-# ============================================================
+#
+# Tersedia 3 template:
+#   [A] HTTPS dengan redirect (RECOMMENDED untuk production)
+#   [B] HTTP only (untuk development lokal tanpa SSL)
+#   [C] Langsung expose port (FastAPI, Node.js, dll.)
 #
 # Setelah menambah/mengubah file ini, reload nginx:
 #   docker exec nginx-proxy nginx -s reload
-#
 # ============================================================
 
+
+# ============================================================
+# [A] TEMPLATE HTTPS — Recommended (dengan redirect HTTP→HTTPS)
+#
+# Prasyarat:
+#   - Sertifikat sudah ada di /etc/nginx/certs/<domain>/
+#   - Local  : jalankan scripts/ssl-local.sh <domain>
+#   - Prod   : jalankan scripts/ssl-production.sh <domain> <email>
+# ============================================================
+
+# Block 1: HTTP → redirect ke HTTPS
 server {
     listen 80;
-    server_name example.local;          # Ganti dengan domain/subdomain kamu
+    server_name example.com;         # Ganti dengan domain kamu
+
+    # ACME challenge untuk Let's Encrypt (production)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Redirect semua HTTP ke HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+
+    access_log /var/log/nginx/example.access.log;
+    error_log  /var/log/nginx/example.error.log;
+}
+
+# Block 2: HTTPS
+server {
+    listen 443 ssl;
+    server_name example.com;         # Ganti dengan domain kamu
+
+    # Sertifikat SSL — generate dengan ssl-local.sh atau ssl-production.sh
+    ssl_certificate     /etc/nginx/certs/example.com/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/example.com/privkey.pem;
+
+    # Shared SSL parameters (cipher suite, HSTS, dll.)
+    include /etc/nginx/conf.d/ssl-params.conf;
 
     # ----- Proxy ke container app -----
     location / {
-        proxy_pass         http://example-nginx:80;   # Ganti: nama-container:port
+        proxy_pass         http://example-app:8000;   # Ganti: nama-container:port
         proxy_http_version 1.1;
         proxy_set_header   Upgrade $http_upgrade;
         proxy_set_header   Connection 'upgrade';
@@ -28,19 +69,55 @@ server {
         proxy_send_timeout 300;
     }
 
-    # ----- Log -----
     access_log /var/log/nginx/example.access.log;
     error_log  /var/log/nginx/example.error.log;
 }
 
+
 # ============================================================
-# TEMPLATE UNTUK SITE YANG LANGSUNG EXPOSE PORT (tanpa nginx internal)
-# Contoh: FastAPI, Node.js, app lain yang tidak punya nginx sendiri
+# [B] TEMPLATE HTTP ONLY — Untuk development lokal tanpa SSL
 # ============================================================
-#
+
 # server {
 #     listen 80;
-#     server_name api.example.local;
+#     server_name example.local;
+#
+#     location / {
+#         proxy_pass         http://example-app:8000;
+#         proxy_http_version 1.1;
+#         proxy_set_header   Upgrade $http_upgrade;
+#         proxy_set_header   Connection 'upgrade';
+#         proxy_set_header   Host $host;
+#         proxy_set_header   X-Real-IP $remote_addr;
+#         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header   X-Forwarded-Proto $scheme;
+#         proxy_cache_bypass $http_upgrade;
+#         proxy_read_timeout 300;
+#     }
+#
+#     access_log /var/log/nginx/example.access.log;
+#     error_log  /var/log/nginx/example.error.log;
+# }
+
+
+# ============================================================
+# [C] TEMPLATE HTTPS — Langsung expose port (FastAPI, Node.js)
+# Gunakan jika app tidak punya nginx internal sendiri
+# ============================================================
+
+# server {
+#     listen 80;
+#     server_name api.example.com;
+#     location /.well-known/acme-challenge/ { root /var/www/certbot; }
+#     location / { return 301 https://$host$request_uri; }
+# }
+#
+# server {
+#     listen 443 ssl;
+#     server_name api.example.com;
+#     ssl_certificate     /etc/nginx/certs/api.example.com/fullchain.pem;
+#     ssl_certificate_key /etc/nginx/certs/api.example.com/privkey.pem;
+#     include /etc/nginx/conf.d/ssl-params.conf;
 #
 #     location / {
 #         proxy_pass         http://fastapi-app:8000;
@@ -50,4 +127,7 @@ server {
 #         proxy_set_header   X-Forwarded-Proto $scheme;
 #         proxy_read_timeout 300;
 #     }
+#
+#     access_log /var/log/nginx/api.access.log;
+#     error_log  /var/log/nginx/api.error.log;
 # }

@@ -102,6 +102,8 @@ fi
 echo ""
 log_info "Menyiapkan direktori /srv..."
 sudo mkdir -p /srv/proxy/conf.d
+sudo mkdir -p /srv/proxy/certs
+sudo mkdir -p /srv/proxy/certbot-www
 sudo mkdir -p /srv/sites
 
 # Salin file proxy ke /srv/proxy
@@ -113,11 +115,16 @@ sudo chown -R "$USER:$USER" /srv/
 log_success "Direktori /srv siap."
 
 # ---- Salin scripts ke /srv ----
-sudo cp "$SCRIPT_DIR/new-site.sh"    /srv/new-site.sh
-sudo cp "$SCRIPT_DIR/remove-site.sh" /srv/remove-site.sh
-sudo cp "$SCRIPT_DIR/list-sites.sh"  /srv/list-sites.sh
-sudo chmod +x /srv/new-site.sh /srv/remove-site.sh /srv/list-sites.sh
-sudo chown "$USER:$USER" /srv/new-site.sh /srv/remove-site.sh /srv/list-sites.sh
+sudo cp "$SCRIPT_DIR/new-site.sh"         /srv/new-site.sh
+sudo cp "$SCRIPT_DIR/remove-site.sh"      /srv/remove-site.sh
+sudo cp "$SCRIPT_DIR/list-sites.sh"       /srv/list-sites.sh
+sudo cp "$SCRIPT_DIR/ssl-local.sh"        /srv/ssl-local.sh
+sudo cp "$SCRIPT_DIR/ssl-production.sh"   /srv/ssl-production.sh
+sudo cp "$SCRIPT_DIR/ssl-renew.sh"        /srv/ssl-renew.sh
+sudo chmod +x /srv/new-site.sh /srv/remove-site.sh /srv/list-sites.sh \
+              /srv/ssl-local.sh /srv/ssl-production.sh /srv/ssl-renew.sh
+sudo chown "$USER:$USER" /srv/new-site.sh /srv/remove-site.sh /srv/list-sites.sh \
+                         /srv/ssl-local.sh /srv/ssl-production.sh /srv/ssl-renew.sh
 
 log_success "Scripts helper tersalin ke /srv/"
 
@@ -144,8 +151,9 @@ echo ""
 echo "  2. Tambah website baru:"
 echo "     /srv/new-site.sh nama-site domain.local 8000"
 echo ""
-echo "  3. Setup /etc/hosts di komputer kamu:"
-echo "     $(hostname -I | awk '{print $1}')   domain.local"
+echo "  3. Aktifkan HTTPS (opsional):"
+echo "     Local (mkcert)   : /srv/ssl-local.sh domain.local"
+echo "     Production       : /srv/ssl-production.sh domain.com email@kamu.com"
 echo ""
-echo "  📖 Dokumentasi lengkap: docs/"
+echo "  📖 Dokumentasi: docs/ | Panduan SSL: docs/ssl.md"
 echo ""
