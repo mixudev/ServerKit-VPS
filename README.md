@@ -6,17 +6,17 @@ Production-ready Docker server infrastructure untuk hosting **multiple websites*
 
 ## ✨ Fitur
 
-- 🔀 **Nginx Reverse Proxy** — satu pintu masuk untuk semua website
-- 🌐 **Multi-site** — hosting banyak website sekaligus, terisolasi satu sama lain
-- 📁 **Per-folder per-site** — setiap website punya folder dan lifecycle sendiri
-- 🔒 **Network isolation** — database dan service internal tidak bisa diakses dari luar
-- ⚡ **Zero-downtime reload** — tambah/ubah site tanpa restart proxy
+-  **Nginx Reverse Proxy** — satu pintu masuk untuk semua website
+-  **Multi-site** — hosting banyak website sekaligus, terisolasi satu sama lain
+-  **Per-folder per-site** — setiap website punya folder dan lifecycle sendiri
+-  **Network isolation** — database dan service internal tidak bisa diakses dari luar
+-  **Zero-downtime reload** — tambah/ubah site tanpa restart proxy
 - 🛠️ **Script helper** — scaffold site baru dengan satu perintah
-- 📖 **Dokumentasi lengkap** — panduan CLI, troubleshooting, dan best practice
+-  **Dokumentasi lengkap** — panduan CLI, troubleshooting, dan best practice
 
 ---
 
-## 📋 Requirements
+##  Requirements
 
 | Komponen | Minimum | Rekomendasi |
 |----------|---------|-------------|
@@ -73,7 +73,7 @@ Ganti `192.168.x.x` dengan IP server kamu. Lalu buka `http://myapp.local` di bro
 
 ---
 
-## 📁 Struktur Repository
+##  Struktur Repository
 
 ```
 docker-server-kit/
@@ -118,7 +118,7 @@ docker-server-kit/
 
 ---
 
-## 📖 Dokumentasi
+##  Dokumentasi
 
 | Dokumen | Deskripsi |
 |---------|-----------|
@@ -130,7 +130,7 @@ docker-server-kit/
 
 ---
 
-## ⚡ Cheat Sheet
+##  Cheat Sheet
 
 ```bash
 # Jalankan proxy
@@ -160,7 +160,7 @@ docker exec -it nama-container sh
 
 ---
 
-## 🏗️ Arsitektur Singkat
+##  Arsitektur Singkat
 
 ```
 Browser
@@ -184,7 +184,7 @@ Setiap site terhubung ke dua network:
 
 ---
 
-## 🤝 Workflow Menambah Website Baru
+##  Workflow Menambah Website Baru
 
 ```bash
 # 1. Scaffold struktur
@@ -207,6 +207,6 @@ docker exec nginx-proxy nginx -s reload
 
 ---
 
-## 📄 License
+##  License
 
 MIT License — bebas digunakan untuk keperluan personal maupun komersial.
